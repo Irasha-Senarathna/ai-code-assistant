@@ -1,6 +1,7 @@
 const { getSkillPrompt } = require("../services/skillService");
+const { callGemini } = require("../services/aiService");
 
-const generateResponse = (req, res) => {
+const generateResponse = async (req, res) => {
     try {
         const { skill, input } = req.body;
 
@@ -12,9 +13,12 @@ const generateResponse = (req, res) => {
 
         const finalPrompt = `${skillText}\n\nUser Input:\n${input}`;
 
+        // 🔥 CALL REAL AI
+        const aiResponse = await callGemini(finalPrompt);
+
         res.json({
-            message: "Prompt generated successfully",
-            prompt: finalPrompt
+            message: "AI response generated successfully",
+            response: aiResponse
         });
 
     } catch (error) {
