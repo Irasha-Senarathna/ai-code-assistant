@@ -13,7 +13,19 @@ const generateResponse = async (req, res) => {
 
         const skillText = getSkillPrompt(skill);
 
-        const finalPrompt = `${skillText}\n\nUser Input:\n${input}`;
+const finalPrompt = `
+You are a professional AI assistant.
+
+RULES:
+- Use clear headings
+- Use bullet points
+- Add spacing between sections
+- Be concise and structured
+- If giving code, format it properly
+
+User request:
+${input}
+`;
 
         const aiResponse = await callGemini(finalPrompt);
 
