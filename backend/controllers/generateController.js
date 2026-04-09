@@ -5,6 +5,8 @@ const generateResponse = async (req, res) => {
     try {
         const { skill, input } = req.body;
 
+        console.log("Incoming request:", req.body);
+
         if (!skill || !input) {
             return res.status(400).json({ error: "Skill and input required" });
         }
@@ -13,7 +15,6 @@ const generateResponse = async (req, res) => {
 
         const finalPrompt = `${skillText}\n\nUser Input:\n${input}`;
 
-        // 🔥 CALL REAL AI
         const aiResponse = await callGemini(finalPrompt);
 
         res.json({
@@ -22,6 +23,7 @@ const generateResponse = async (req, res) => {
         });
 
     } catch (error) {
+        console.error("FULL ERROR:", error);
         res.status(500).json({ error: error.message });
     }
 };

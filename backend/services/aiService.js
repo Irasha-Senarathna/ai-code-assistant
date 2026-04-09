@@ -15,10 +15,19 @@ async function callGemini(prompt) {
             ]
         });
 
-        return response.data.candidates[0].content.parts[0].text;
+        console.log("RAW GEMINI RESPONSE:", JSON.stringify(response.data, null, 2));
+
+        const text =
+            response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!text) {
+            throw new Error("No response text from Gemini");
+        }
+
+        return text;
 
     } catch (error) {
-        console.log("FULL ERROR:", error.response?.data || error.message);
+        console.error("FULL ERROR:", error.response?.data || error.message);
         throw new Error("Gemini API failed");
     }
 }
