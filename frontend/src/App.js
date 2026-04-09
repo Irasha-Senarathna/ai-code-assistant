@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import ChatMessage from "./components/ChatMessage";
 
 export default function App() {
   const [input, setInput] = useState("");
@@ -14,12 +13,16 @@ export default function App() {
   // Auto scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, loading]);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
 
-    const userMsg = { role: "user", text: input };
+    const userMsg = {
+      role: "user",
+      text: input,
+      time: new Date().toLocaleTimeString(),
+    };
 
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
@@ -31,13 +34,21 @@ export default function App() {
         input,
       });
 
-      const aiMsg = { role: "ai", text: res.data.response };
+      const aiMsg = {
+        role: "ai",
+        text: res.data.response,
+        time: new Date().toLocaleTimeString(),
+      };
 
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { role: "ai", text: "❌ Error connecting to server" },
+        {
+          role: "ai",
+          text: "❌ Error connecting to server",
+          time: new Date().toLocaleTimeString(),
+        },
       ]);
     }
 
@@ -45,11 +56,11 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-950 text-white">
+    <div className="flex h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
 
       {/* Sidebar */}
-      <div className="w-64 bg-gray-900 p-4 border-r border-gray-800">
-        <h2 className="text-xl font-bold mb-4">AI Assistant</h2>
+      <div className="w-64 bg-gray-900/60 backdrop-blur-md p-4 border-r border-gray-800">
+        <h2 className="text-xl font-bold mb-4">⚡ AI Assistant</h2>
 
         <select
           className="w-full bg-gray-800 p-2 rounded"
@@ -62,9 +73,10 @@ export default function App() {
         </select>
 
         <div className="mt-6 text-gray-400 text-sm space-y-1">
-          <p>✔ Smart AI</p>
-          <p>✔ Skill-based prompts</p>
-          <p>✔ Gemini powered</p>
+          <p>✔ Smart AI Engine</p>
+          <p>✔ Skill-Based Prompts</p>
+          <p>✔ Gemini Powered</p>
+          <p>✔ Pro UI Mode</p>
         </div>
       </div>
 
@@ -72,35 +84,24 @@ export default function App() {
       <div className="flex flex-col flex-1">
 
         {/* Header */}
-        <div className="p-4 border-b border-gray-800 text-lg font-semibold">
-          Chat Assistant
+        <div className="p-4 border-b border-gray-800 bg-gray-900/40 backdrop-blur-md">
+          <h1 className="text-lg font-semibold">Chat Assistant</h1>
         </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-
           {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`max-w-xl p-3 rounded-lg whitespace-pre-wrap ${
-                msg.role === "user"
-                  ? "bg-blue-600 ml-auto"
-                  : "bg-gray-800"
-              }`}
-            >
-              {msg.role === "ai" ? (
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {msg.text}
-                </ReactMarkdown>
-              ) : (
-                <p>{msg.text}</p>
-              )}
+            <div key={i}>
+              <ChatMessage msg={msg} />
+              <div className="text-xs text-gray-500 mt-1 ml-2">
+                {msg.time}
+              </div>
             </div>
           ))}
 
           {/* Loading */}
           {loading && (
-            <div className="flex gap-2 items-center text-gray-400">
+            <div className="flex items-center gap-2 text-gray-400">
               <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
               <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></span>
               <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-300"></span>
@@ -112,7 +113,7 @@ export default function App() {
         </div>
 
         {/* Input */}
-        <div className="p-4 border-t border-gray-800 flex gap-2">
+        <div className="p-4 border-t border-gray-800 flex gap-2 bg-gray-900/40 backdrop-blur-md">
           <input
             className="flex-1 p-3 rounded bg-gray-800 outline-none"
             value={input}
