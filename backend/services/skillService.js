@@ -5,7 +5,7 @@ function getSkillPrompt(skillName) {
     const filePath = path.join(__dirname, "../../skills", `${skillName}.md`);
 
     if (!fs.existsSync(filePath)) {
-        throw new Error("Skill not found");
+        return "You are a helpful AI assistant.";
     }
 
     return fs.readFileSync(filePath, "utf-8");
