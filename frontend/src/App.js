@@ -1,11 +1,14 @@
 import { useState } from "react";
 import axios from "axios";
+import { useEffect, useRef } from "react";
+import TypingText from "./components/TypingText";
 
 export default function App() {
   const [input, setInput] = useState("");
   const [skill, setSkill] = useState("code-review");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
 
   const sendMessage = async () => {
     if (!input) return;
@@ -33,6 +36,10 @@ export default function App() {
     setInput("");
     setLoading(false);
   };
+
+  useEffect(() => {
+  bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [messages]);
 
   return (
     <div className="flex h-screen bg-gray-950 text-white">
@@ -76,10 +83,15 @@ export default function App() {
                   ? "bg-blue-600 ml-auto"
                   : "bg-gray-800"
               }`}
+              
             >
-              {msg.text}
+              {msg.role === "ai" ? (
+                <TypingText text={msg.text} speed={20} />              ) : (
+                 msg.text
+               )}
             </div>
           ))}
+          <div ref={bottomRef}></div>
 
           {loading && (
             <div className="text-gray-400 animate-pulse">
