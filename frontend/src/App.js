@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import axios from "axios";
 import ChatMessage from "./components/ChatMessage";
 
 export default function App() {
@@ -16,45 +15,96 @@ export default function App() {
   }, [messages, loading]);
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+  if (!input.trim() || loading) return;
 
-    const userMsg = {
-      role: "user",
-      text: input,
-      time: new Date().toLocaleTimeString(),
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setLoading(true);
-
-    try {
-      const res = await axios.post("http://localhost:3000/generate", {
-        skill,
-        input,
-      });
-
-      const aiMsg = {
-        role: "ai",
-        text: res.data.response,
-        time: new Date().toLocaleTimeString(),
-      };
-
-      setMessages((prev) => [...prev, aiMsg]);
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "ai",
-          text: "❌ Error connecting to server",
-          time: new Date().toLocaleTimeString(),
-        },
-      ]);
-    }
-
-    setLoading(false);
+  const userMsg = {
+    role: "user",
+    text: input,
+    time: new Date().toLocaleTimeString(),
   };
 
+  setMessages((prev) => [...prev, userMsg]);
+  setInput("");
+  setLoading(true);
+
+  try {
+    const fakeResponse = `
+## AI Assistant Response
+
+Great question! Here is a structured answer:
+
+### 🔹 Explanation
+This is a simulated streaming response.
+
+### 🔹 Key Points
+- Streaming UI works properly
+- Messages update in real-time
+- Chat system is stable
+
+### 🔹 Code Example
+\`\`\`js
+function hello() {
+  console.log("Hello World");
+}
+\`\`\`
+
+### 🔹 Summary
+Your system is working perfectly 🎉
+`;
+
+    let i = 0;
+    let aiText = "";
+
+    // create AI message FIRST and store index
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "ai",
+        text: "",
+        time: new Date().toLocaleTimeString(),
+      },
+    ]);
+
+    const aiIndex = messages.length + 1; // position of AI message
+
+    const interval = setInterval(() => {
+      if (i >= fakeResponse.length) {
+        clearInterval(interval);
+        setLoading(false);
+        return;
+      }
+
+      aiText += fakeResponse[i];
+
+      setMessages((prev) => {
+        const updated = [...prev];
+
+        updated[aiIndex] = {
+          ...updated[aiIndex],
+          text: aiText,
+        };
+
+        return updated;
+      });
+
+      i++;
+    }, 10);
+
+  } catch (err) {
+    console.error(err);
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "ai",
+        text: "❌ Error: " + err.message,
+        time: new Date().toLocaleTimeString(),
+      },
+    ]);
+
+    setLoading(false);
+  }
+};
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
 
@@ -99,7 +149,7 @@ export default function App() {
             </div>
           ))}
 
-          {/* Loading */}
+          {/* Loading animation */}
           {loading && (
             <div className="flex items-center gap-2 text-gray-400">
               <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
@@ -131,6 +181,7 @@ export default function App() {
             Send
           </button>
         </div>
+
       </div>
     </div>
   );

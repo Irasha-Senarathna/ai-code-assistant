@@ -7,7 +7,7 @@ export default function ChatMessage({ msg }) {
   const [copied, setCopied] = useState(false);
 
   const copyText = async () => {
-    await navigator.clipboard.writeText(msg.text);
+    await navigator.clipboard.writeText(msg.text || "");
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -34,10 +34,15 @@ export default function ChatMessage({ msg }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ inline, children }) {
+          code({ inline, className, children }) {
+            const match = /language-(\w+)/.exec(className || "");
+
             return !inline ? (
-              <SyntaxHighlighter language="javascript">
-                {String(children)}
+              <SyntaxHighlighter
+                language={match ? match[1] : "javascript"}
+                PreTag="div"
+              >
+                {String(children).replace(/\n$/, "")}
               </SyntaxHighlighter>
             ) : (
               <code className="bg-gray-700 px-1 rounded">
@@ -47,7 +52,7 @@ export default function ChatMessage({ msg }) {
           },
         }}
       >
-        {msg.text}
+        {msg.text || ""}
       </ReactMarkdown>
     </div>
   );
