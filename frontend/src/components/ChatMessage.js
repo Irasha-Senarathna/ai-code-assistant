@@ -14,26 +14,29 @@ export default function ChatMessage({ msg }) {
 
   return (
     <div
-      className={`relative max-w-xl p-4 rounded-2xl shadow-lg backdrop-blur-md border border-gray-700/40 whitespace-pre-wrap ${
+      className={`group relative max-w-2xl p-4 rounded-2xl shadow-md transition-all duration-300 whitespace-pre-wrap ${
         msg.role === "user"
           ? "bg-blue-600 ml-auto text-white"
-          : "bg-gray-800 text-white"
+          : "bg-gray-800 text-white hover:bg-gray-700"
       }`}
     >
-      {/* Copy button only for AI */}
+      {/* Copy button */}
       {msg.role === "ai" && (
         <button
           onClick={copyText}
-          className="absolute top-2 right-2 text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+          className="opacity-0 group-hover:opacity-100 transition absolute top-2 right-2 text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
         >
           {copied ? "Copied!" : "Copy"}
         </button>
       )}
 
-      {/* Markdown Renderer */}
+      {/* Markdown */}
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          p({ children }) {
+            return <div className="mb-2">{children}</div>; // 🔥 FIX DOM ERROR
+          },
           code({ inline, className, children }) {
             const match = /language-(\w+)/.exec(className || "");
 

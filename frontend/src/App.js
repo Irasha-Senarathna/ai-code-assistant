@@ -15,96 +15,76 @@ export default function App() {
   }, [messages, loading]);
 
   const sendMessage = async () => {
-  if (!input.trim() || loading) return;
+    if (!input.trim()) return;
 
-  const userMsg = {
-    role: "user",
-    text: input,
-    time: new Date().toLocaleTimeString(),
-  };
+    const userMsg = {
+      role: "user",
+      text: input,
+      time: new Date().toLocaleTimeString(),
+    };
 
-  setMessages((prev) => [...prev, userMsg]);
-  setInput("");
-  setLoading(true);
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    setLoading(true);
 
-  try {
-    const fakeResponse = `
-## AI Assistant Response
-
-Great question! Here is a structured answer:
-
-### 🔹 Explanation
-This is a simulated streaming response.
-
-### 🔹 Key Points
-- Streaming UI works properly
-- Messages update in real-time
-- Chat system is stable
-
-### 🔹 Code Example
-\`\`\`js
-function hello() {
-  console.log("Hello World");
-}
-\`\`\`
-
-### 🔹 Summary
-Your system is working perfectly 🎉
-`;
-
-    let i = 0;
-    let aiText = "";
-
-    // create AI message FIRST and store index
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "ai",
-        text: "",
-        time: new Date().toLocaleTimeString(),
-      },
-    ]);
-
-    const aiIndex = messages.length + 1; // position of AI message
-
-    const interval = setInterval(() => {
-      if (i >= fakeResponse.length) {
-        clearInterval(interval);
-        setLoading(false);
-        return;
-      }
-
-      aiText += fakeResponse[i];
-
-      setMessages((prev) => {
-        const updated = [...prev];
-
-        updated[aiIndex] = {
-          ...updated[aiIndex],
-          text: aiText,
-        };
-
-        return updated;
+    try {
+      const res = await fetch("http://localhost:3000/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skill, input }),
       });
 
-      i++;
-    }, 10);
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Server error");
+      }
 
-  } catch (err) {
-    console.error(err);
+      if (!res.body) {
+        throw new Error("Streaming not supported by browser");
+      }
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "ai",
-        text: "❌ Error: " + err.message,
-        time: new Date().toLocaleTimeString(),
-      },
-    ]);
+      // create placeholder AI message
+      setMessages((prev) => [
+        ...prev,
+        { role: "ai", text: "", time: new Date().toLocaleTimeString() },
+      ]);
 
-    setLoading(false);
-  }
-};
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let aiText = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const cleanChunk = chunk.replace(/^data: /gm, "");
+        aiText += cleanChunk;
+
+        setMessages((prev) => {
+          const updated = [...prev];
+          if (updated.length > 0) {
+            updated[updated.length - 1] = {
+              ...updated[updated.length - 1],
+              text: aiText,
+            };
+          }
+          return updated;
+        });
+      }
+
+      setLoading(false);
+
+    } catch (err) {
+      console.error("Frontend error:", err);
+      setMessages((prev) => [
+        ...prev,
+        { role: "ai", text: "❌ " + (err.message || err), time: new Date().toLocaleTimeString() },
+      ]);
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
 
@@ -139,7 +119,7 @@ Your system is working perfectly 🎉
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-3 scroll-smooth">
           {messages.map((msg, i) => (
             <div key={i}>
               <ChatMessage msg={msg} />
@@ -152,10 +132,12 @@ Your system is working perfectly 🎉
           {/* Loading animation */}
           {loading && (
             <div className="flex items-center gap-2 text-gray-400">
-              <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
-              <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></span>
-              <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-300"></span>
-              Thinking...
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></span>
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-300"></span>
+              </div>
+              <span>AI is typing...</span>
             </div>
           )}
 
