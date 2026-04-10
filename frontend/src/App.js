@@ -4,32 +4,62 @@ import ChatMessage from "./components/ChatMessage";
 export default function App() {
   const [input, setInput] = useState("");
   const [skill, setSkill] = useState("code-review");
-  const [messages, setMessages] = useState([]);
+  const [chats, setChats] = useState(() => {
+    const saved = localStorage.getItem("chatList");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [currentChatId, setCurrentChatId] = useState(() => {
+    const saved = localStorage.getItem("chatList");
+    const parsedChats = saved ? JSON.parse(saved) : [];
+    return parsedChats.length > 0 ? parsedChats[0].id : null;
+  });
   const [loading, setLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
 
   const bottomRef = useRef(null);
+
+  // Helper to get current messages
+  const messages = chats.find((c) => c.id === currentChatId)?.messages || [];
+
+  // Helper setter to maintain compatibility with existing message update logic
+  const setMessages = (updater) => {
+    if (!currentChatId) return;
+    setChats((prevChats) =>
+      prevChats.map((chat) => {
+        if (chat.id === currentChatId) {
+          const nextMessages = typeof updater === "function" ? updater(chat.messages) : updater;
+          const newTitle = chat.title === "New Chat" && nextMessages.length > 0
+            ? nextMessages[0].text.slice(0, 25) + "..."
+            : chat.title;
+          return { ...chat, messages: nextMessages, title: newTitle };
+        }
+        return chat;
+      })
+    );
+  };
+
+  const createNewChat = () => {
+    const newChat = {
+      id: Date.now(),
+      title: "New Chat",
+      messages: [],
+    };
+    setChats((prev) => [newChat, ...prev]);
+    setCurrentChatId(newChat.id);
+  };
 
   // Auto scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Load saved chats
-  useEffect(() => {
-    const saved = localStorage.getItem("chatMessages");
-    if (saved) {
-      setMessages(JSON.parse(saved));
-    }
-  }, []);
-
   // Persist chats
   useEffect(() => {
-    localStorage.setItem("chatMessages", JSON.stringify(messages));
-  }, [messages]);
+    localStorage.setItem("chatList", JSON.stringify(chats));
+  }, [chats]);
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !currentChatId) return; // Ensure a chat exists before sending
 
     const userMsg = {
       role: "user",
@@ -37,7 +67,9 @@ export default function App() {
       time: new Date().toLocaleTimeString(),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    // Use the new helper instead of setMessages
+    updateChatMessages([...messages, userMsg]);
+    
     setInput("");
     setLoading(true);
 
@@ -99,6 +131,16 @@ export default function App() {
     }
   };
 
+  const updateChatMessages = (newMessages) => {
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === currentChatId
+          ? { ...chat, messages: newMessages }
+          : chat
+      )
+    );
+  };
+
   return (
     <div
       className={`flex h-screen ${
@@ -131,18 +173,32 @@ export default function App() {
         </select>
 
         <button
-          onClick={() => { setMessages([]); localStorage.removeItem("chatMessages"); }}
-          className="w-full mt-4 bg-red-600 p-2 rounded hover:bg-red-700 transition"
+          onClick={createNewChat}
+          className="w-full mt-4 bg-green-600 p-2 rounded hover:bg-green-700 transition"
         >
-          Clear Chat
+          + New Chat
         </button>
 
-        <div className="mt-6 text-sm text-gray-400 space-y-2 max-h-40 overflow-y-auto">
-          <p className="text-white font-semibold">Recent Chats</p>
+        <button
+          onClick={() => { setChats([]); localStorage.removeItem("chatList"); setCurrentChatId(null); }}
+          className="w-full mt-2 bg-red-600 p-2 rounded hover:bg-red-700 transition"
+        >
+          Clear All Chats
+        </button>
 
-          {messages.slice(-5).map((msg, i) => (
-            <div key={i} className={`truncate p-2 rounded text-xs ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}>
-              {msg.text ? msg.text.slice(0, 40) : ""}
+        <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
+          <p className="text-white font-semibold mb-2">Recent Chats</p>
+          {chats.map((chat) => (
+            <div
+              key={chat.id}
+              onClick={() => setCurrentChatId(chat.id)}
+              className={`p-2 rounded cursor-pointer transition ${
+                currentChatId === chat.id
+                  ? "bg-blue-600 text-white"
+                  : darkMode ? "bg-gray-800 hover:bg-gray-700 text-gray-300" : "bg-gray-200 hover:bg-gray-300 text-black"
+              }`}
+            >
+              {chat.title || "New Chat"}
             </div>
           ))}
         </div>
@@ -175,12 +231,65 @@ export default function App() {
                   <button
                     onClick={() => {
                       const newText = prompt("Edit your message:", msg.text);
-                      if (newText === null) return;
+                      if (!newText) return;
+
                       setMessages((prev) => {
                         const updated = [...prev];
-                        updated[i] = { ...updated[i], text: newText };
+
+                        // 1. update user message
+                        updated[i].text = newText;
+
+                        // 2. remove next AI response if exists
+                        if (updated[i + 1] && updated[i + 1].role === "ai") {
+                          updated.splice(i + 1, 1);
+                        }
+
                         return updated;
                       });
+
+                      // 3. simulate new AI response (mock streaming)
+                      let fakeResponse = `
+## Updated AI Response
+
+You edited your message to:
+
+"${newText}"
+
+### 🔹 Explanation
+This is a regenerated response based on your updated input.
+
+### 🔹 Result
+- Old response removed
+- New response generated
+- System behaves correctly
+`;
+
+                      let words = fakeResponse.split(" ");
+                      let index = 0;
+
+                      setMessages((prev) => [
+                        ...prev,
+                        {
+                          role: "ai",
+                          text: "",
+                          time: new Date().toLocaleTimeString(),
+                        },
+                      ]);
+
+                      const interval = setInterval(() => {
+                        if (index >= words.length) {
+                          clearInterval(interval);
+                          return;
+                        }
+
+                        setMessages((prev) => {
+                          const updated = [...prev];
+                          updated[updated.length - 1].text += words[index] + " ";
+                          return updated;
+                        });
+
+                        index++;
+                      }, 30);
                     }}
                     className="opacity-0 group-hover:opacity-100 text-xs text-gray-400 ml-2"
                   >
@@ -214,6 +323,46 @@ export default function App() {
         <div
           className={`p-4 border-t border-gray-800 flex gap-2 ${darkMode ? "bg-gray-900/40" : "bg-white/30"} backdrop-blur-md`}
         >
+          {/* File Upload UI */}
+          <input
+            type="file"
+            id="file-upload"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (!file || !currentChatId) return;
+
+              const fileMsg = {
+                role: "user",
+                text: `📎 Uploaded: ${file.name}`,
+                time: new Date().toLocaleTimeString(),
+              };
+
+              // Note: using the 'messages' variable we defined earlier
+              updateChatMessages([...messages, fileMsg]);
+
+              // mock AI response
+              setTimeout(() => {
+                updateChatMessages([
+                  ...messages,
+                  fileMsg,
+                  {
+                    role: "ai",
+                    text: `✅ File "${file.name}" processed successfully (mock).`,
+                    time: new Date().toLocaleTimeString(),
+                  },
+                ]);
+              }, 1000);
+            }}
+          />
+          <label
+            htmlFor="file-upload"
+            className="cursor-pointer bg-gray-700 px-4 py-3 rounded hover:bg-gray-600 transition flex items-center justify-center text-xl"
+            title="Upload File"
+          >
+            📎
+          </label>
+
           <input
             className={`flex-1 p-3 rounded outline-none ${darkMode ? "bg-gray-800 text-white" : "bg-white text-black"}`}
             value={input}
@@ -235,3 +384,4 @@ export default function App() {
     </div>
   );
 }
+
