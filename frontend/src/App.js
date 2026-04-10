@@ -15,6 +15,7 @@ export default function App() {
   });
   const [loading, setLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
+  const [documents, setDocuments] = useState({}); // Stores uploaded text per chat ID
 
   const bottomRef = useRef(null);
 
@@ -61,23 +62,32 @@ export default function App() {
   const sendMessage = async () => {
     if (!input.trim() || !currentChatId) return; // Ensure a chat exists before sending
 
+    // 1. Grab any document stored for this chat
+    const chatDocument = documents[currentChatId] || null;
+
     const userMsg = {
       role: "user",
       text: input,
       time: new Date().toLocaleTimeString(),
     };
 
-    // Use the new helper instead of setMessages
     updateChatMessages([...messages, userMsg]);
     
     setInput("");
     setLoading(true);
 
     try {
+      // 2. Attach the document into the body payload
+      const payload = { 
+        skill, 
+        input,
+        context: chatDocument // The RAG chunk (if uploaded)
+      };
+
       const res = await fetch("http://localhost:3000/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ skill, input }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -215,9 +225,16 @@ export default function App() {
       <div className="flex flex-col flex-1">
         {/* Header */}
         <div
-          className={`p-4 border-b border-gray-800 ${darkMode ? "bg-gray-900/40" : "bg-white/30"} backdrop-blur-md`}
+          className={`p-4 border-b border-gray-800 flex justify-between items-center ${darkMode ? "bg-gray-900/40" : "bg-white/30"} backdrop-blur-md`}
         >
           <h1 className="text-lg font-semibold">Chat Assistant</h1>
+          
+          {/* Document Status UI */}
+          {documents[currentChatId] && (
+            <div className="text-xs px-3 py-1 bg-green-500/20 text-green-400 rounded-full whitespace-nowrap">
+              📄 Document Active
+            </div>
+          )}
         </div>
 
         {/* Messages */}
@@ -328,9 +345,19 @@ This is a regenerated response based on your updated input.
             type="file"
             id="file-upload"
             className="hidden"
-            onChange={(e) => {
+            accept=".txt,.md,.json,.csv" // simple text formats for now
+            onChange={async (e) => {
               const file = e.target.files[0];
               if (!file || !currentChatId) return;
+
+              // Extract text (simple extraction for text-based files)
+              const text = await file.text();
+
+              // Save document for current chat
+              setDocuments((prev) => ({
+                ...prev,
+                [currentChatId]: text,
+              }));
 
               const fileMsg = {
                 role: "user",
@@ -338,17 +365,17 @@ This is a regenerated response based on your updated input.
                 time: new Date().toLocaleTimeString(),
               };
 
-              // Note: using the 'messages' variable we defined earlier
+              // Note: using the 'messages' helper
               updateChatMessages([...messages, fileMsg]);
 
-              // mock AI response
+              // Mock AI confirmation
               setTimeout(() => {
                 updateChatMessages([
                   ...messages,
                   fileMsg,
                   {
                     role: "ai",
-                    text: `✅ File "${file.name}" processed successfully (mock).`,
+                    text: `✅ File "${file.name}" processed successfully. Its content is now available as context for this chat.`,
                     time: new Date().toLocaleTimeString(),
                   },
                 ]);
