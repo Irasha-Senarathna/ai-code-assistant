@@ -167,8 +167,28 @@ export default function App() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-3 scroll-smooth">
           {messages.map((msg, i) => (
-            <div key={i}>
-              <ChatMessage msg={msg} />
+            <div key={i} className="group">
+              <div className="flex items-start gap-2">
+                <ChatMessage msg={msg} />
+
+                {msg.role === "user" && (
+                  <button
+                    onClick={() => {
+                      const newText = prompt("Edit your message:", msg.text);
+                      if (newText === null) return;
+                      setMessages((prev) => {
+                        const updated = [...prev];
+                        updated[i] = { ...updated[i], text: newText };
+                        return updated;
+                      });
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-xs text-gray-400 ml-2"
+                  >
+                    ✏️ Edit
+                  </button>
+                )}
+              </div>
+
               <div className={`text-xs ${darkMode ? "text-gray-500" : "text-gray-600"} mt-1 ml-2`}>
                 {msg.time}
               </div>
