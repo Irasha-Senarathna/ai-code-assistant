@@ -16,6 +16,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [documents, setDocuments] = useState({}); // Stores uploaded text per chat ID
+  const [useAI, setUseAI] = useState(false); // Controls whether to call Gemini
+  const [apiCount, setApiCount] = useState(() => {
+    return Number(localStorage.getItem("apiCount")) || 0;
+  });
 
   const bottomRef = useRef(null);
 
@@ -60,7 +64,7 @@ export default function App() {
   }, [chats]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !currentChatId) return; // Ensure a chat exists before sending
+    if (!input.trim() || !currentChatId) return;
 
     // 1. Grab any document stored for this chat
     const chatDocument = documents[currentChatId] || null;
@@ -72,12 +76,67 @@ export default function App() {
     };
 
     updateChatMessages([...messages, userMsg]);
-    
     setInput("");
     setLoading(true);
 
+    // ============================================
+    // 🟢 LOCAL MOCK / RAG MODE (SAVES API QUOTA!)
+    // ============================================
+    if (!useAI) {
+      setTimeout(() => {
+        let fakeText = "";
+
+        if (chatDocument) {
+          // Fake Local RAG Logic
+          fakeText = `📄 **Local RAG Memory**\n\nI see you uploaded a document. I am analyzing the content locally. You asked: "${userMsg.text}".\n\n*(Turn on AI Mode ⚡ to ask Gemini about this document)*`;
+        } else {
+          // Fake Basic Response
+          fakeText = `🤖 **Local Mock Mode**\n\nYou said: "${userMsg.text}".\n\nI am currently in local dev mode protecting your API quota. *(Turn on AI Mode ⚡ to use Gemini)*`;
+        }
+
+        updateChatMessages([
+          ...messages,
+          userMsg,
+          {
+            role: "ai",
+            text: fakeText,
+            time: new Date().toLocaleTimeString(),
+          },
+        ]);
+        setLoading(false);
+      }, 800);
+      return; // Stop here, do not call API
+    }
+
+    // ============================================
+    // ⚡ REAL GEMINI API CALL
+    // ============================================
+    
+    // HARD LIMIT PROTECTION
+    if (apiCount >= 20) {
+      updateChatMessages([
+        ...messages,
+        userMsg,
+        {
+          role: "ai",
+          text: `## ⚠️ API Limit Reached\n\nYou have used all 20 API requests.\n\nPlease switch to "Local Mock (Free)" mode.`,
+          time: new Date().toLocaleTimeString(),
+        },
+      ]);
+      setLoading(false);
+      // Turn off UI usage
+      setUseAI(false); 
+      return;
+    }
+
     try {
-      // 2. Attach the document into the body payload
+      // ✅ Track successful API intent
+      setApiCount((prev) => {
+        const updated = prev + 1;
+        localStorage.setItem("apiCount", updated);
+        return updated;
+      });
+
       const payload = { 
         skill, 
         input,
@@ -172,6 +231,18 @@ export default function App() {
           Toggle Theme
         </button>
 
+        <button
+          onClick={() => setUseAI(!useAI)}
+          className={`w-full mb-3 p-2 rounded transition font-semibold flex items-center justify-between ${
+            useAI 
+              ? "bg-amber-500 hover:bg-amber-600 text-black shadow-[0_0_10px_rgba(245,158,11,0.5)]" 
+              : "bg-gray-700 hover:bg-gray-600 text-gray-300"
+          }`}
+        >
+          <span>{useAI ? "Gemini AI" : "Local Mock (Free)"}</span>
+          <span>{useAI ? "⚡ ON" : "💤 OFF"}</span>
+        </button>
+
         <select
           className={`w-full p-2 rounded ${darkMode ? "bg-gray-800" : "bg-white border"}`}
           value={skill}
@@ -219,6 +290,13 @@ export default function App() {
           <p>✔ Gemini Powered</p>
           <p>✔ Pro UI Mode</p>
         </div>
+      </div>
+
+      {/* Footer Info Area */}
+      <div className="mt-6 pt-4 border-t border-gray-700 text-gray-400 text-sm space-y-1">
+        <p>✔ Smart AI Engine</p>
+        <p>✔ Skill-Based Prompts</p>
+        <p className="text-yellow-400 font-bold mt-2">API Used: {apiCount} / 20</p>
       </div>
 
       {/* Main Chat */}
