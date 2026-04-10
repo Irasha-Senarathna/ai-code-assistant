@@ -6,6 +6,7 @@ export default function App() {
   const [skill, setSkill] = useState("code-review");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
 
   const bottomRef = useRef(null);
 
@@ -13,6 +14,19 @@ export default function App() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Load saved chats
+  useEffect(() => {
+    const saved = localStorage.getItem("chatMessages");
+    if (saved) {
+      setMessages(JSON.parse(saved));
+    }
+  }, []);
+
+  // Persist chats
+  useEffect(() => {
+    localStorage.setItem("chatMessages", JSON.stringify(messages));
+  }, [messages]);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -86,14 +100,28 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
-
+    <div
+      className={`flex h-screen ${
+        darkMode
+          ? "bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white"
+          : "bg-gray-100 text-black"
+      }`}
+    >
       {/* Sidebar */}
-      <div className="w-64 bg-gray-900/60 backdrop-blur-md p-4 border-r border-gray-800">
+      <div
+        className={`w-64 ${darkMode ? "bg-gray-900/60" : "bg-white/80"} backdrop-blur-md p-4 border-r border-gray-800`}
+      >
         <h2 className="text-xl font-bold mb-4">⚡ AI Assistant</h2>
 
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          className="w-full mb-3 bg-gray-700 p-2 rounded hover:bg-gray-600 transition"
+        >
+          Toggle Theme
+        </button>
+
         <select
-          className="w-full bg-gray-800 p-2 rounded"
+          className={`w-full p-2 rounded ${darkMode ? "bg-gray-800" : "bg-white border"}`}
           value={skill}
           onChange={(e) => setSkill(e.target.value)}
         >
@@ -101,6 +129,23 @@ export default function App() {
           <option value="debug">Debug</option>
           <option value="explain">Explain</option>
         </select>
+
+        <button
+          onClick={() => { setMessages([]); localStorage.removeItem("chatMessages"); }}
+          className="w-full mt-4 bg-red-600 p-2 rounded hover:bg-red-700 transition"
+        >
+          Clear Chat
+        </button>
+
+        <div className="mt-6 text-sm text-gray-400 space-y-2 max-h-40 overflow-y-auto">
+          <p className="text-white font-semibold">Recent Chats</p>
+
+          {messages.slice(-5).map((msg, i) => (
+            <div key={i} className={`truncate p-2 rounded text-xs ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}>
+              {msg.text ? msg.text.slice(0, 40) : ""}
+            </div>
+          ))}
+        </div>
 
         <div className="mt-6 text-gray-400 text-sm space-y-1">
           <p>✔ Smart AI Engine</p>
@@ -112,9 +157,10 @@ export default function App() {
 
       {/* Main Chat */}
       <div className="flex flex-col flex-1">
-
         {/* Header */}
-        <div className="p-4 border-b border-gray-800 bg-gray-900/40 backdrop-blur-md">
+        <div
+          className={`p-4 border-b border-gray-800 ${darkMode ? "bg-gray-900/40" : "bg-white/30"} backdrop-blur-md`}
+        >
           <h1 className="text-lg font-semibold">Chat Assistant</h1>
         </div>
 
@@ -123,7 +169,7 @@ export default function App() {
           {messages.map((msg, i) => (
             <div key={i}>
               <ChatMessage msg={msg} />
-              <div className="text-xs text-gray-500 mt-1 ml-2">
+              <div className={`text-xs ${darkMode ? "text-gray-500" : "text-gray-600"} mt-1 ml-2`}>
                 {msg.time}
               </div>
             </div>
@@ -145,9 +191,11 @@ export default function App() {
         </div>
 
         {/* Input */}
-        <div className="p-4 border-t border-gray-800 flex gap-2 bg-gray-900/40 backdrop-blur-md">
+        <div
+          className={`p-4 border-t border-gray-800 flex gap-2 ${darkMode ? "bg-gray-900/40" : "bg-white/30"} backdrop-blur-md`}
+        >
           <input
-            className="flex-1 p-3 rounded bg-gray-800 outline-none"
+            className={`flex-1 p-3 rounded outline-none ${darkMode ? "bg-gray-800 text-white" : "bg-white text-black"}`}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask something..."
@@ -163,7 +211,6 @@ export default function App() {
             Send
           </button>
         </div>
-
       </div>
     </div>
   );
