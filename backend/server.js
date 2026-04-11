@@ -2,6 +2,34 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
+// PDF & Embedding logic
+const { extractTextFromPDF } = require("./services/pdfService");
+const { chunkText } = require("./services/chunkService");
+const { getEmbedding } = require("./services/embeddingService");
+const { storeEmbedding } = require("./services/vectorDB");
+
+async function loadPDF() {
+  try {
+    const text = await extractTextFromPDF("./data/sample.pdf");
+    const chunks = chunkText(text);
+
+    console.log("Chunks created:", chunks.length);
+
+    for (let chunk of chunks) {
+      if (!chunk.trim()) continue;
+      const embedding = await getEmbedding(chunk);
+      storeEmbedding(chunk, embedding);
+    }
+
+    console.log("✅ PDF processed into vector DB");
+  } catch (error) {
+    console.warn("⚠️ PDF skipping load (sample.pdf might not exist yet):", error.message);
+  }
+}
+
+// Load RAG Pipeline on startup
+loadPDF();
+
 const generateRoute = require("./routes/generateRoute");
 
 const app = express();
