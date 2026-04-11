@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import ChatMessage from "./components/ChatMessage";
 
 export default function App() {
@@ -20,11 +20,14 @@ export default function App() {
   const [apiCount, setApiCount] = useState(() => {
     return Number(localStorage.getItem("apiCount")) || 0;
   });
+  const [pendingFile, setPendingFile] = useState(null);
 
   const bottomRef = useRef(null);
 
-  // Helper to get current messages
-  const messages = chats.find((c) => c.id === currentChatId)?.messages || [];
+  // ✅ Fix: Wrap messages in useMemo to prevent infinite dependency loops
+  const messages = useMemo(() => {
+    return chats.find((c) => c.id === currentChatId)?.messages || [];
+  }, [chats, currentChatId]);
 
   // Helper setter to maintain compatibility with existing message update logic
   const setMessages = (updater) => {
@@ -64,14 +67,36 @@ export default function App() {
   }, [chats]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !currentChatId) return;
+    if (!input.trim() && !pendingFile) return;
 
-    // 1. Grab any document stored for this chat
-    const chatDocument = documents[currentChatId] || null;
+    let currentInput = input;
+    let fileData = null;
+    let fileCtxPrefix = "";
+
+    if (pendingFile) {
+      setLoading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", pendingFile);
+
+        const uploadRes = await fetch("http://localhost:3000/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (uploadRes.ok) {
+          fileData = await uploadRes.json();
+          fileCtxPrefix = `[Document Attached: ${pendingFile.name}]\n`;
+          setPendingFile(null); // Clear after upload
+        }
+      } catch (err) {
+        console.error("Upload failed:", err);
+      }
+    }
 
     const userMsg = {
       role: "user",
-      text: input,
+      text: fileCtxPrefix + currentInput,
       time: new Date().toLocaleTimeString(),
     };
 
@@ -86,7 +111,7 @@ export default function App() {
       setTimeout(() => {
         let fakeText = "";
 
-        if (chatDocument) {
+        if (fileData) {
           // Fake Local RAG Logic
           fakeText = `📄 **Local RAG Memory**\n\nI see you uploaded a document. I am analyzing the content locally. You asked: "${userMsg.text}".\n\n*(Turn on AI Mode ⚡ to ask Gemini about this document)*`;
         } else {
@@ -137,10 +162,17 @@ export default function App() {
         return updated;
       });
 
+      // Generate history from messages
+      const historyText = messages
+        .filter((m) => m.role !== "system" && !m.text.includes("📎 Uploaded"))
+        .map((m) => `${m.role}: ${m.text}`)
+        .join("\n");
+
       const payload = { 
         skill, 
         input,
-        context: chatDocument // The RAG chunk (if uploaded)
+        history: historyText,
+        context: fileData // Optional direct RAG context
       };
 
       const res = await fetch("http://localhost:3000/generate", {
@@ -176,12 +208,14 @@ export default function App() {
         const cleanChunk = chunk.replace(/^data: /gm, "");
         aiText += cleanChunk;
 
+        // ✅ Fix: Use functional state update to avoid 'aiText' closure issues
+        const currentAiText = aiText; 
         setMessages((prev) => {
           const updated = [...prev];
           if (updated.length > 0) {
             updated[updated.length - 1] = {
               ...updated[updated.length - 1],
-              text: aiText,
+              text: currentAiText,
             };
           }
           return updated;
@@ -414,76 +448,61 @@ This is a regenerated response based on your updated input.
           <div ref={bottomRef}></div>
         </div>
 
-        {/* Input */}
+        {/* Input area wrapper */}
         <div
-          className={`p-4 border-t border-gray-800 flex gap-2 ${darkMode ? "bg-gray-900/40" : "bg-white/30"} backdrop-blur-md`}
+          className={`p-4 border-t border-gray-800 ${darkMode ? "bg-gray-900/40" : "bg-white/30"} backdrop-blur-md`}
         >
-          {/* File Upload UI */}
-          <input
-            type="file"
-            id="file-upload"
-            className="hidden"
-            accept=".txt,.md,.json,.csv" // simple text formats for now
-            onChange={async (e) => {
-              const file = e.target.files[0];
-              if (!file || !currentChatId) return;
+          {/* Pending File Indicator */}
+          {pendingFile && (
+            <div className="flex items-center gap-2 mb-2 bg-blue-600/20 text-blue-400 px-3 py-1 rounded w-fit text-sm animate-pulse">
+              <span>📄 {pendingFile.name}</span>
+              <button 
+                onClick={() => setPendingFile(null)} 
+                className="hover:text-red-400 transition"
+                title="Remove file"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
-              // Extract text (simple extraction for text-based files)
-              const text = await file.text();
+          <div className="flex gap-2">
+            {/* File Upload UI */}
+            <input
+              type="file"
+              id="file-upload"
+              className="hidden"
+              accept=".pdf,.txt"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) setPendingFile(file);
+              }}
+            />
+            <label
+              htmlFor="file-upload"
+              className={`cursor-pointer px-4 py-3 rounded transition flex items-center justify-center text-xl ${pendingFile ? "bg-blue-600 text-white" : "bg-gray-700 hover:bg-gray-600"}`}
+              title="Upload File"
+            >
+              📎
+            </label>
 
-              // Save document for current chat
-              setDocuments((prev) => ({
-                ...prev,
-                [currentChatId]: text,
-              }));
+            <input
+              className={`flex-1 p-3 rounded outline-none ${darkMode ? "bg-gray-800 text-white" : "bg-white text-black"}`}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask something..."
+              onKeyDown={(e) => {
+                if (e.key === "Enter") sendMessage();
+              }}
+            />
 
-              const fileMsg = {
-                role: "user",
-                text: `📎 Uploaded: ${file.name}`,
-                time: new Date().toLocaleTimeString(),
-              };
-
-              // Note: using the 'messages' helper
-              updateChatMessages([...messages, fileMsg]);
-
-              // Mock AI confirmation
-              setTimeout(() => {
-                updateChatMessages([
-                  ...messages,
-                  fileMsg,
-                  {
-                    role: "ai",
-                    text: `✅ File "${file.name}" processed successfully. Its content is now available as context for this chat.`,
-                    time: new Date().toLocaleTimeString(),
-                  },
-                ]);
-              }, 1000);
-            }}
-          />
-          <label
-            htmlFor="file-upload"
-            className="cursor-pointer bg-gray-700 px-4 py-3 rounded hover:bg-gray-600 transition flex items-center justify-center text-xl"
-            title="Upload File"
-          >
-            📎
-          </label>
-
-          <input
-            className={`flex-1 p-3 rounded outline-none ${darkMode ? "bg-gray-800 text-white" : "bg-white text-black"}`}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask something..."
-            onKeyDown={(e) => {
-              if (e.key === "Enter") sendMessage();
-            }}
-          />
-
-          <button
-            onClick={sendMessage}
-            className="bg-blue-600 px-6 rounded hover:bg-blue-700 transition"
-          >
-            Send
-          </button>
+            <button
+              onClick={sendMessage}
+              className="bg-blue-600 px-6 rounded hover:bg-blue-700 transition"
+            >
+              Send
+            </button>
+          </div>
         </div>
       </div>
     </div>

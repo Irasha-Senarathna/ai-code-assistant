@@ -6,7 +6,14 @@ require("dotenv").config();
 const { extractTextFromPDF } = require("./services/pdfService");
 const { chunkText } = require("./services/chunkService");
 const { getEmbedding } = require("./services/embeddingService");
-const { storeEmbedding } = require("./services/vectorDB");
+const { storeEmbedding, loadDB } = require("./services/vectorDB");
+
+// Routes
+const generateRoute = require("./routes/generateRoute");
+const uploadRoute = require("./routes/uploadRoute");
+
+// Load existing Vector DB from disk
+loadDB();
 
 async function loadPDF() {
   try {
@@ -27,10 +34,8 @@ async function loadPDF() {
   }
 }
 
-// Load RAG Pipeline on startup
-loadPDF();
-
-const generateRoute = require("./routes/generateRoute");
+// Load RAG Pipeline on startup (Optional: remove if you only want manual uploads)
+// loadPDF(); 
 
 const app = express();
 
@@ -42,6 +47,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/generate", generateRoute);
+app.use("/upload", uploadRoute);
 
 app.listen(3000, () => {
     console.log("Server running on port 3000");

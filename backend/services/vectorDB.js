@@ -1,8 +1,39 @@
+const fs = require("fs");
+const path = require("path");
+
 let db = []; // In-memory vector database
 
-// Save embeddings
-function storeEmbedding(text, embedding) {
-  db.push({ text, embedding });
+// Save database to file
+function saveDB() {
+  try {
+    const dataPath = path.join(__dirname, "../data/vectorDB.json");
+    // Ensure data directory exists
+    if (!fs.existsSync(path.dirname(dataPath))) {
+      fs.mkdirSync(path.dirname(dataPath), { recursive: true });
+    }
+    fs.writeFileSync(dataPath, JSON.stringify(db));
+  } catch (error) {
+    console.error("Failed to save Vector DB:", error);
+  }
+}
+
+// Load database from file
+function loadDB() {
+  const dataPath = path.join(__dirname, "../data/vectorDB.json");
+  if (fs.existsSync(dataPath)) {
+    try {
+      db = JSON.parse(fs.readFileSync(dataPath));
+      console.log(`✅ Loaded ${db.length} embeddings from disk.`);
+    } catch (error) {
+      console.error("Failed to load Vector DB:", error);
+    }
+  }
+}
+
+// Save embeddings with a source
+function storeEmbedding(text, embedding, source = "default") {
+  db.push({ text, embedding, source });
+  saveDB(); // Optionally save automatically on store
 }
 
 // Cosine similarity
@@ -36,4 +67,4 @@ function searchEmbedding(queryEmbedding, topN = 3) {
     .map((r) => r.text);
 }
 
-module.exports = { storeEmbedding, searchEmbedding };
+module.exports = { storeEmbedding, searchEmbedding, saveDB, loadDB };

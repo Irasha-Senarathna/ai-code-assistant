@@ -4,7 +4,7 @@ const { searchEmbedding } = require("../services/vectorDB");
 
 const generateResponse = async (req, res) => {
   try {
-    const { input } = req.body;
+    const { input, history } = req.body;
 
     if (!input) {
       return res.status(400).json({ error: "Input required" });
@@ -19,11 +19,13 @@ const generateResponse = async (req, res) => {
     // 🧠 Build context
     const context = relevantChunks.join("\n\n");
 
-    // Construct a grounded prompt
+    // Construct a grounded prompt with Conversation History
     const finalPrompt = [
       "You are a professional AI assistant.",
-      "Answer ONLY using the knowledge context provided below.",
-      "If the answer is not found in the context, reply exactly: 'Not found in knowledge base.'",
+      "Answer using the knowledge context provided below. If you don't know the answer, say 'Not found in knowledge base.'",
+      "",
+      "Conversation History:",
+      history || "No previous history.",
       "",
       "Knowledge Context:",
       context || "No relevant context found.",
