@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import ChatMessage from "./components/ChatMessage";
+import AuthPage from "./pages/AuthPage";
 
 export default function App() {
+  const [isAuth, setIsAuth] = useState(false);
   const [input, setInput] = useState("");
   const [skill, setSkill] = useState("code-review");
   const [chats, setChats] = useState(() => {
@@ -23,6 +25,11 @@ export default function App() {
   const [pendingFile, setPendingFile] = useState(null);
 
   const bottomRef = useRef(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) setIsAuth(true);
+  }, []);
 
   // ✅ Fix: Wrap messages in useMemo to prevent infinite dependency loops
   const messages = useMemo(() => {
@@ -244,6 +251,10 @@ export default function App() {
     );
   };
 
+  if (!isAuth) {
+    return <AuthPage onAuth={() => setIsAuth(true)} />;
+  }
+
   return (
     <div
       className={`flex h-screen ${
@@ -324,6 +335,16 @@ export default function App() {
           <p>✔ Gemini Powered</p>
           <p>✔ Pro UI Mode</p>
         </div>
+
+        <button
+          onClick={() => {
+            localStorage.removeItem("token");
+            setIsAuth(false);
+          }}
+          className="mt-6 w-full bg-red-600 py-2 rounded hover:bg-red-700 text-white"
+        >
+          Logout
+        </button>
       </div>
 
       {/* Footer Info Area */}
